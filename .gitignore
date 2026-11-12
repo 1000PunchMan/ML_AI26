@@ -1,2 +1,23 @@
+# --- Окружение ---
 .venv/
+venv/
+.env            # секреты и API-ключи, если появятся
+
+# --- Python ---
+__pycache__/
+*.pyc
+
+# --- Jupyter ---
+.ipynb_checkpoints/
+
+# --- Системный мусор macOS ---
+.DS_Store
+
+# --- Редакторы ---
+.vscode/
+.idea/
+
+# --- Личное ---
 CLAUDE.md
+.claude/
+my_smth/transcriptions/
