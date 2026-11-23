@@ -54,7 +54,7 @@ def coin_likelihood():
     for pv, c in [(.1, GRAY), (.5, ORANGE), (.7, RED)]:
         v = comb(10, 7) * pv ** 7 * (1 - pv) ** 3
         ax.scatter([pv], [v], c=c, s=70, zorder=3)
-        ax.annotate(f"p={pv}: {v:.3f}", (pv, v), xytext=(pv - .17 if pv > .5 else pv + .02, v + .02),
+        ax.annotate(f"p={pv}: {v:.3f}", (pv, v), xytext=(pv + .04, v - .004 if pv > .5 else v + .01 if pv < .5 else v - .012),
                     color=c, fontsize=10)
     ax.axvline(.7, c=RED, ls=":", lw=1)
     ax.set(title="Правдоподобие L(p) = C(10,7)·p⁷·(1−p)³\n«насколько вероятно увидеть 7 орлов из 10 при данном p»",
@@ -103,7 +103,7 @@ def normal_vs_laplace():
     ax.semilogy(z, l_pdf, c=RED, lw=2.5)
     ax.set_ylim(1e-7, 1)
     ax.set(title="То же в лог-шкале: «тяжёлый хвост» Лапласа", xlabel="шум ε (в σ)")
-    ax.annotate("у Лапласа далёкие\nзначения в тысячи раз\nвероятнее", xy=(4, l_pdf[np.argmin(abs(z - 4))]),
+    ax.annotate("у Лапласа далёкие\nзначения встречаются\nнамного чаще", xy=(4, l_pdf[np.argmin(abs(z - 4))]),
                 xytext=(.3, 1e-6), arrowprops=dict(arrowstyle="->"), fontsize=9)
     ax = axes[2]
     ks = np.array([1, 2, 3, 4])
