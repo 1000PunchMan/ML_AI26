@@ -1,0 +1,375 @@
+<title>L1 против L2</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<script>
+  // Настройка MathJax: формулы в $...$ и $$...$$, вывод в SVG
+  window.MathJax = { tex: { inlineMath: [['$', '$']], displayMath: [['$$', '$$']] }, svg: { fontCache: 'global' } };
+</script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-svg.min.js"></script>
+<style>
+  /* Макет: одна колонка ~980px; две панели (ромб и круг) рядом, на телефоне — друг под другом */
+  :root {
+    --bg: #f6f7f9;            /* фон страницы, холодный светлый */
+    --surface: #ffffff;       /* панели графиков */
+    --fg: #1c2230;            /* основной текст */
+    --muted: #5b6475;         /* подписи */
+    --line: #d9dde5;          /* сетка и рамки */
+    --contour: #9aa3b5;       /* линии уровня ошибки */
+    --l1: #d4621b;            /* L1 — оранжевый ромб */
+    --l2: #6d4bc4;            /* L2 — фиолетовый круг */
+    --center: #2563b8;        /* решение без регуляризации */
+    --sol: #c4302b;           /* решение с регуляризацией */
+    --zero: #1f7a4d;          /* «вес обнулён» */
+    --font-display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+    --font-body: "Inter", "Segoe UI", system-ui, sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #12151c; --surface: #1a1f29; --fg: #e6e9ef; --muted: #9aa3b5; --line: #2d3444;
+      --contour: #5d6780; --l1: #f08a45; --l2: #a58cf0; --center: #6aa4f0; --sol: #f06a63; --zero: #4fc48a;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12151c; --surface: #1a1f29; --fg: #e6e9ef; --muted: #9aa3b5; --line: #2d3444;
+    --contour: #5d6780; --l1: #f08a45; --l2: #a58cf0; --center: #6aa4f0; --sol: #f06a63; --zero: #4fc48a;
+    color-scheme: dark;
+  }
+  body {
+    background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.55;
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 28px 48px;
+  }
+  main { max-width: 980px; margin: 0 auto; display: grid; gap: 28px; }
+  h1, h2 { font-family: var(--font-display); text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+  h1 { font-size: 30px; }
+  h2 { font-size: 21px; }
+  p { margin: 0; max-width: 68ch; }
+  .lead { color: var(--muted); }
+  header, section { display: grid; gap: 12px; }
+
+  /* Две панели с графиками */
+  .panels { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  @media (max-width: 720px) { .panels { grid-template-columns: minmax(0, 1fr); } }
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: grid; gap: 8px; min-width: 0; }
+  .panel h3 { margin: 0; font-family: var(--font-display); font-size: 16px; display: flex; align-items: center; gap: 8px; }
+  .swatch { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+  svg.plot { width: 100%; height: auto; display: block; touch-action: none; user-select: none; }
+  svg.plot .drag { cursor: grab; }
+  svg.plot .drag:active { cursor: grabbing; }
+  .readout { font-family: var(--font-mono); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; font-variant-numeric: tabular-nums; }
+  .chip { font-family: var(--font-body); font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; border: 1px solid currentColor; }
+  .chip.zero { color: var(--zero); }
+  .chip.nozero { color: var(--muted); }
+
+  /* Ползунки */
+  .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px 20px; }
+  .ctl { display: grid; gap: 4px; min-width: 0; }
+  .ctl label { font-size: 13px; color: var(--muted); display: flex; justify-content: space-between; gap: 8px; }
+  .ctl output { font-family: var(--font-mono); color: var(--fg); font-variant-numeric: tabular-nums; }
+  input[type="range"] { width: 100%; accent-color: var(--center); }
+  input[type="range"]:focus-visible { outline: 2px solid var(--center); outline-offset: 3px; }
+  .presets { display: flex; flex-wrap: wrap; gap: 8px; }
+  button { font: inherit; font-size: 13px; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); cursor: pointer; }
+  button:hover { border-color: var(--center); }
+  button:focus-visible { outline: 2px solid var(--center); outline-offset: 2px; }
+
+  .note { border-left: 3px solid var(--line); padding-left: 12px; color: var(--muted); font-size: 14px; }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 14px; }
+  th, td { padding: 6px 14px; border-bottom: 1px solid var(--line); text-align: left; }
+  th { color: var(--muted); font-weight: 500; }
+  td.num { font-family: var(--font-mono); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<main>
+  <header>
+    <h1>L1 против L2</h1>
+    <p class="lead">Лекция 4, 0:33–0:47. Ищем веса с наименьшей ошибкой, но не выходя за допустимую область: ромб $|w_1| + |w_2| \le C$ для L1 и круг $w_1^2 + w_2^2 \le C^2$ для L2. Перетащи синюю точку (решение без регуляризации) и посмотри, когда L1 делает вес ровно нулём.</p>
+  </header>
+
+  <section aria-label="Геометрия L1 и L2">
+    <div class="panels">
+      <div class="panel">
+        <h3><span class="swatch" style="background: var(--l1)"></span>L1 (Lasso): ромб</h3>
+        <svg class="plot" id="plot-l1" viewBox="0 0 400 400" role="img" aria-label="Линии уровня ошибки и ромб L1"></svg>
+        <div class="readout" id="read-l1"></div>
+      </div>
+      <div class="panel">
+        <h3><span class="swatch" style="background: var(--l2)"></span>L2 (Ridge): круг</h3>
+        <svg class="plot" id="plot-l2" viewBox="0 0 400 400" role="img" aria-label="Линии уровня ошибки и круг L2"></svg>
+        <div class="readout" id="read-l2"></div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="ctl">
+        <label for="cx"><span>центр: вес $w_1$ без регуляризации</span> <output id="cx-out"></output></label>
+        <input type="range" id="cx" min="-1.2" max="3" step="0.01" value="0.5">
+      </div>
+      <div class="ctl">
+        <label for="cy"><span>центр: вес $w_2$ без регуляризации</span> <output id="cy-out"></output></label>
+        <input type="range" id="cy" min="-1.2" max="3" step="0.01" value="2.3">
+      </div>
+      <div class="ctl">
+        <label for="budget"><span>бюджет $C$ (больше $\alpha$ — меньше $C$)</span> <output id="budget-out"></output></label>
+        <input type="range" id="budget" min="0.2" max="2.5" step="0.01" value="1">
+      </div>
+      <div class="ctl">
+        <label for="tilt"><span>наклон эллипсов (связь признаков)</span> <output id="tilt-out"></output></label>
+        <input type="range" id="tilt" min="-0.6" max="0.6" step="0.01" value="0.3">
+      </div>
+    </div>
+    <div class="presets" role="group" aria-label="Готовые примеры">
+      <button type="button" data-preset="0.5,2.3,1,0.3">Один вес маленький (как на слайде)</button>
+      <button type="button" data-preset="1.6,2.2,1,0.3">Оба веса большие</button>
+      <button type="button" data-preset="0.8,0.6,1.6,0.3">Решение внутри области</button>
+      <button type="button" data-preset="2.4,0.25,0.6,0">Сильная регуляризация</button>
+    </div>
+    <p class="note">Красная кривая — линия уровня ошибки, которая первой касается области. Точка касания — решение с регуляризацией. У ромба углы лежат на осях, поэтому касание углом обнуляет один вес. У круга углов нет, и касание на оси бывает только случайно.</p>
+  </section>
+
+  <section aria-label="Одномерный пример">
+    <h2>Один вес: почему L1 даёт ровно ноль</h2>
+    <p>Пусть без регуляризации лучший вес равен $w_0$, а ошибка вокруг него $(w - w_0)^2$. Добавляем штраф и ищем минимум:</p>
+    <p>$$\text{L2: } w^* = \frac{w_0}{1 + \alpha} \qquad\qquad \text{L1: } w^* = \operatorname{sign}(w_0)\cdot\max\big(|w_0| - \tfrac{\alpha}{2},\ 0\big)$$</p>
+    <div class="panel">
+      <svg class="plot" id="plot-1d" viewBox="0 0 640 300" role="img" aria-label="Вес после регуляризации в зависимости от исходного веса"></svg>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th></th><th>вес $w^*$</th><th>что произошло</th></tr></thead>
+          <tbody>
+            <tr><td>без регуляризации</td><td class="num" id="t-none"></td><td>—</td></tr>
+            <tr><td style="color: var(--l2)">L2 (Ridge)</td><td class="num" id="t-l2"></td><td id="t-l2-note"></td></tr>
+            <tr><td style="color: var(--l1)">L1 (Lasso)</td><td class="num" id="t-l1"></td><td id="t-l1-note"></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="controls">
+      <div class="ctl">
+        <label for="w0"><span>$w_0$ — вес без регуляризации</span> <output id="w0-out"></output></label>
+        <input type="range" id="w0" min="-2.5" max="2.5" step="0.01" value="0.3">
+      </div>
+      <div class="ctl">
+        <label for="alpha"><span>$\alpha$ — сила регуляризации</span> <output id="alpha-out"></output></label>
+        <input type="range" id="alpha" min="0" max="3" step="0.01" value="1">
+      </div>
+    </div>
+    <p class="note">L1 вычитает из веса постоянные $\alpha/2$ и останавливается в нуле: все веса с $|w_0| \le \alpha/2$ выключаются. L2 делит вес на $1 + \alpha$, и ноль не получается никогда. Зато большой вес L1 сжимает слабее: при $w_0 = 2$, $\alpha = 1$ L1 даёт $1.5$, а L2 — $1.0$.</p>
+  </section>
+</main>
+
+<script>
+(() => {
+  const NS = "http://www.w3.org/2000/svg";
+  const LO = -1.6, HI = 3.2, SIZE = 400;             // видимая область весов и размер svg
+  const toPx = v => (v - LO) / (HI - LO) * SIZE;      // вес → пиксель по x
+  const toPy = v => SIZE - toPx(v);                   // вес → пиксель по y (ось вверх)
+  const fromPx = px => LO + px / SIZE * (HI - LO);    // пиксель → вес
+  const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+  const state = { cx: 0.5, cy: 2.3, C: 1, tilt: 0.3 };
+  const $ = id => document.getElementById(id);
+
+  // Создать svg-элемент с атрибутами
+  function el(tag, attrs, parent) {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+
+  // Матрица формы ошибки: Q(w) = (w-c)ᵀ A (w-c)
+  const matA = () => [[1, state.tilt], [state.tilt, 0.7]];
+  function q(w1, w2) {
+    const A = matA(), d1 = w1 - state.cx, d2 = w2 - state.cy;
+    return A[0][0] * d1 * d1 + 2 * A[0][1] * d1 * d2 + A[1][1] * d2 * d2;
+  }
+
+  // Точки эллипса уровня q = level: c + sqrt(level) · A^(-1/2) · (cos t, sin t)
+  function ellipsePath(level) {
+    const A = matA(), a = A[0][0], b = A[0][1], d = A[1][1];
+    const tr = a + d, det = a * d - b * b, disc = Math.sqrt(tr * tr / 4 - det);
+    const l1 = tr / 2 + disc, l2 = tr / 2 - disc;               // собственные числа
+    let v1 = Math.abs(b) > 1e-9 ? [l1 - d, b] : [1, 0];          // собственный вектор для l1
+    const n = Math.hypot(v1[0], v1[1]); v1 = [v1[0] / n, v1[1] / n];
+    const v2 = [-v1[1], v1[0]];
+    const r1 = Math.sqrt(level / l1), r2 = Math.sqrt(level / l2);
+    let path = "";
+    for (let i = 0; i <= 120; i++) {
+      const t = i / 120 * 2 * Math.PI, u1 = r1 * Math.cos(t), u2 = r2 * Math.sin(t);
+      const x = state.cx + u1 * v1[0] + u2 * v2[0], y = state.cy + u1 * v1[1] + u2 * v2[1];
+      path += (i ? "L" : "M") + toPx(x).toFixed(1) + " " + toPy(y).toFixed(1);
+    }
+    return path + "Z";
+  }
+
+  // Решение задачи «min Q при ||w|| ≤ C»: перебор 3600 точек границы (вершины ромба попадают в перебор)
+  function solve(kind) {
+    const C = state.C, inside = kind === "l1"
+      ? Math.abs(state.cx) + Math.abs(state.cy) <= C
+      : Math.hypot(state.cx, state.cy) <= C;
+    if (inside) return { w: [state.cx, state.cy], inside: true };
+    let best = null, bestQ = Infinity;
+    for (let i = 0; i < 3600; i++) {
+      const t = i / 3600 * 2 * Math.PI, c = Math.cos(t), s = Math.sin(t);
+      const k = kind === "l1" ? C / (Math.abs(c) + Math.abs(s)) : C;
+      const w1 = k * c, w2 = k * s, v = q(w1, w2);
+      if (v < bestQ) { bestQ = v; best = [w1, w2]; }
+    }
+    return { w: best, inside: false };
+  }
+
+  // Нарисовать одну панель (L1 или L2)
+  function drawPanel(kind) {
+    const svg = $("plot-" + kind);
+    svg.replaceChildren();
+    const grid = css("--line"), fg = css("--muted");
+    for (let v = -1; v <= 3; v++) {                         // сетка через 1
+      el("line", { x1: toPx(v), x2: toPx(v), y1: 0, y2: SIZE, stroke: grid, "stroke-width": 1 }, svg);
+      el("line", { y1: toPy(v), y2: toPy(v), x1: 0, x2: SIZE, stroke: grid, "stroke-width": 1 }, svg);
+      if (v !== 0) {
+        el("text", { x: toPx(v) + 3, y: toPy(0) + 14, fill: fg, "font-size": 11 }, svg).textContent = v;
+        el("text", { x: toPx(0) + 4, y: toPy(v) - 4, fill: fg, "font-size": 11 }, svg).textContent = v;
+      }
+    }
+    el("line", { x1: 0, x2: SIZE, y1: toPy(0), y2: toPy(0), stroke: css("--fg"), "stroke-width": 1.2 }, svg);   // ось w1
+    el("line", { y1: 0, y2: SIZE, x1: toPx(0), x2: toPx(0), stroke: css("--fg"), "stroke-width": 1.2 }, svg);   // ось w2
+    el("text", { x: SIZE - 22, y: toPy(0) - 6, fill: css("--fg"), "font-size": 13 }, svg).textContent = "w₁";
+    el("text", { x: toPx(0) + 6, y: 14, fill: css("--fg"), "font-size": 13 }, svg).textContent = "w₂";
+
+    // Допустимая область
+    const C = state.C, color = css(kind === "l1" ? "--l1" : "--l2");
+    if (kind === "l1") {
+      const pts = [[C, 0], [0, C], [-C, 0], [0, -C]].map(p => toPx(p[0]) + "," + toPy(p[1])).join(" ");
+      el("polygon", { points: pts, fill: color, "fill-opacity": 0.18, stroke: color, "stroke-width": 2 }, svg);
+    } else {
+      el("circle", { cx: toPx(0), cy: toPy(0), r: C / (HI - LO) * SIZE, fill: color, "fill-opacity": 0.18, stroke: color, "stroke-width": 2 }, svg);
+    }
+
+    // Линии уровня ошибки
+    for (const lv of [0.05, 0.2, 0.5, 1, 1.7, 2.6, 3.7, 5, 6.5]) {
+      el("path", { d: ellipsePath(lv), fill: "none", stroke: css("--contour"), "stroke-width": 1 }, svg);
+    }
+
+    // Решение и касающаяся линия уровня
+    const { w, inside } = solve(kind);
+    const level = q(w[0], w[1]);
+    if (!inside && level > 1e-9) el("path", { d: ellipsePath(level), fill: "none", stroke: css("--sol"), "stroke-width": 2.2 }, svg);
+    el("circle", { cx: toPx(w[0]), cy: toPy(w[1]), r: 7, fill: css("--sol"), stroke: css("--surface"), "stroke-width": 2 }, svg);
+
+    // Центр — перетаскиваемая точка
+    const c = el("circle", { cx: toPx(state.cx), cy: toPy(state.cy), r: 9, fill: css("--center"), stroke: css("--surface"), "stroke-width": 2, class: "drag", tabindex: -1 }, svg);
+    el("title", {}, c).textContent = "Решение без регуляризации — перетащи";
+    attachDrag(svg);
+
+    // Подпись под графиком
+    const zero = j => Math.abs(w[j]) < 5e-3;
+    const fmt = v => (Math.abs(v) < 5e-3 ? 0 : v).toFixed(2);
+    const read = $("read-" + kind);
+    let chip;
+    if (inside) chip = '<span class="chip nozero">центр внутри области — регуляризация не мешает</span>';
+    else if (zero(0) || zero(1)) chip = `<span class="chip zero">w${zero(0) ? "₁" : "₂"} = 0: признак выключен</span>`;
+    else chip = '<span class="chip nozero">веса уменьшились, нулей нет</span>';
+    read.innerHTML = `<span>w* = (${fmt(w[0])}, ${fmt(w[1])})</span>${chip}`;
+  }
+
+  // Перетаскивание центра мышью/пальцем
+  function attachDrag(svg) {
+    if (svg.dataset.drag) return;
+    svg.dataset.drag = "1";
+    let active = false;
+    const move = ev => {
+      const r = svg.getBoundingClientRect();
+      const x = fromPx((ev.clientX - r.left) / r.width * SIZE);
+      const y = fromPx(SIZE - (ev.clientY - r.top) / r.height * SIZE);
+      setState({ cx: clamp(x, -1.2, 3), cy: clamp(y, -1.2, 3) });
+    };
+    svg.addEventListener("pointerdown", ev => { active = true; svg.setPointerCapture(ev.pointerId); move(ev); });
+    svg.addEventListener("pointermove", ev => { if (active) move(ev); });
+    const stop = () => { active = false; };
+    svg.addEventListener("pointerup", stop);
+    svg.addEventListener("pointercancel", stop);
+  }
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+
+  // Синхронизация ползунков и перерисовка
+  function setState(patch) {
+    Object.assign(state, patch);
+    $("cx").value = state.cx; $("cy").value = state.cy; $("budget").value = state.C; $("tilt").value = state.tilt;
+    $("cx-out").textContent = (+state.cx).toFixed(2);
+    $("cy-out").textContent = (+state.cy).toFixed(2);
+    $("budget-out").textContent = (+state.C).toFixed(2);
+    $("tilt-out").textContent = (+state.tilt).toFixed(2);
+    drawPanel("l1"); drawPanel("l2");
+  }
+  $("cx").addEventListener("input", e => setState({ cx: +e.target.value }));
+  $("cy").addEventListener("input", e => setState({ cy: +e.target.value }));
+  $("budget").addEventListener("input", e => setState({ C: +e.target.value }));
+  $("tilt").addEventListener("input", e => setState({ tilt: +e.target.value }));
+  document.querySelectorAll("[data-preset]").forEach(b => b.addEventListener("click", () => {
+    const [cx, cy, C, tilt] = b.dataset.preset.split(",").map(Number);
+    setState({ cx, cy, C, tilt });
+  }));
+
+  // ---------- Одномерный пример ----------
+  const one = { w0: 0.3, alpha: 1 };
+  const W = 640, H = 300, PAD = 40, R = 2.5;          // ось w0 и w* от -2.5 до 2.5
+  const sx = v => PAD + (v + R) / (2 * R) * (W - 2 * PAD);
+  const sy = v => H - PAD + 10 - (v + R) / (2 * R) * (H - 2 * PAD);
+  const l1 = (w0, a) => Math.sign(w0) * Math.max(Math.abs(w0) - a / 2, 0);
+  const l2 = (w0, a) => w0 / (1 + a);
+
+  function draw1d() {
+    const svg = $("plot-1d"); svg.replaceChildren();
+    const a = one.alpha, grid = css("--line"), muted = css("--muted");
+    // полоса «выключенных» весов для L1
+    el("rect", { x: sx(-a / 2), y: sy(R), width: sx(a / 2) - sx(-a / 2), height: sy(-R) - sy(R), fill: css("--l1"), "fill-opacity": 0.1 }, svg);
+    for (let v = -2; v <= 2; v++) {
+      el("line", { x1: sx(v), x2: sx(v), y1: sy(-R), y2: sy(R), stroke: grid }, svg);
+      el("line", { x1: sx(-R), x2: sx(R), y1: sy(v), y2: sy(v), stroke: grid }, svg);
+      el("text", { x: sx(v), y: sy(-R) + 16, fill: muted, "font-size": 11, "text-anchor": "middle" }, svg).textContent = v;
+      el("text", { x: sx(-R) - 8, y: sy(v) + 4, fill: muted, "font-size": 11, "text-anchor": "end" }, svg).textContent = v;
+    }
+    el("text", { x: sx(R) - 4, y: sy(-R) - 8, fill: muted, "font-size": 12, "text-anchor": "end" }, svg).textContent = "w₀ — вес без регуляризации";
+    el("text", { x: sx(-R) + 4, y: sy(R) - 6, fill: muted, "font-size": 12 }, svg).textContent = "w* — вес с регуляризацией";
+    const line = (f, color, dash) => {
+      let d = "";
+      for (let i = 0; i <= 200; i++) { const x = -R + i / 200 * 2 * R; d += (i ? "L" : "M") + sx(x).toFixed(1) + " " + sy(f(x)).toFixed(1); }
+      el("path", { d, fill: "none", stroke: color, "stroke-width": dash ? 1.5 : 2.6, "stroke-dasharray": dash ? "4 4" : "none" }, svg);
+    };
+    line(x => x, muted, true);
+    line(x => l2(x, a), css("--l2"));
+    line(x => l1(x, a), css("--l1"));
+    // текущая точка
+    const w0 = one.w0;
+    el("line", { x1: sx(w0), x2: sx(w0), y1: sy(-R), y2: sy(R), stroke: css("--center"), "stroke-dasharray": "3 3" }, svg);
+    for (const [v, c] of [[w0, muted], [l2(w0, a), css("--l2")], [l1(w0, a), css("--l1")]]) {
+      el("circle", { cx: sx(w0), cy: sy(v), r: 6, fill: c, stroke: css("--surface"), "stroke-width": 2 }, svg);
+    }
+    // таблица
+    const L1 = l1(w0, a), L2 = l2(w0, a);
+    $("t-none").textContent = w0.toFixed(2);
+    $("t-l2").textContent = L2.toFixed(3);
+    $("t-l2-note").textContent = a === 0 ? "штрафа нет" : `поделили на 1 + α = ${(1 + a).toFixed(2)}`;
+    $("t-l1").textContent = L1.toFixed(3);
+    $("t-l1-note").textContent = a === 0 ? "штрафа нет"
+      : (L1 === 0 ? `|w₀| ≤ α/2 = ${(a / 2).toFixed(2)} → ровно 0` : `вычли α/2 = ${(a / 2).toFixed(2)}`);
+    $("w0-out").textContent = w0.toFixed(2);
+    $("alpha-out").textContent = a.toFixed(2);
+  }
+  $("w0").addEventListener("input", e => { one.w0 = +e.target.value; draw1d(); });
+  $("alpha").addEventListener("input", e => { one.alpha = +e.target.value; draw1d(); });
+
+  // Перерисовать при смене темы, чтобы цвета взялись из новых токенов
+  const redraw = () => { setState({}); draw1d(); };
+  try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", redraw); } catch (e) {}
+  new MutationObserver(redraw).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+  redraw();
+})();
+</script>
